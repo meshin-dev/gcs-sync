@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  sync:
+    build: .
+    container_name: sync_${INSTANCE:-default}
+    volumes:
+      # Settings folder with project yaml and service account credentials
+      - ./settings:/app/settings:ro
+      # All folders mounted in the Docker container from host machine for syncing
+      - ${SOURCE_FOLDER_01:-.}:/mnt/source_01:ro
+
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/settings/service-account.json
+      - CLOUDSDK_CORE_PROJECT=personal-421720
+      - CLOUDSDK_COMPUTE_REGION=me-west1
+
+    restart: unless-stopped

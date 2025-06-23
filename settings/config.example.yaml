@@ -1,0 +1,12 @@
+sync:
+  - src: /mnt/source_01
+    dst: gs://my-bucket
+    directions:
+      - full
+    enabled: true
+    ignore:
+      - "**/.DS_Store"
+      - "**/node_modules"
+      - "**/__pycache__"
+      - "**/.venv"
+      - "**/.git"

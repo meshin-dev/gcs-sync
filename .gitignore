@@ -1,0 +1,4 @@
+.env
+.idea
+settings/*.json
+settings/config.yaml
