@@ -4,6 +4,10 @@ sync:
     directions:
       - full
     enabled: true
+    # Bigger amount of files you have - use bigger duration to not call long listing API too often.
+    debounce_window: 5m
+    # The same is for polling from remote, it uses listing API and should not happen too often.
+    remote_poll_window: 1h
     ignore:
       - "**/.DS_Store"
       - "**/node_modules"

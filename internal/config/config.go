@@ -3,6 +3,7 @@ package config
 import (
 	"gopkg.in/yaml.v3"
 	"os"
+	"time"
 )
 
 // Config mirrors the YAML schema.
@@ -23,11 +24,13 @@ const (
 )
 
 type SyncRule struct {
-	Src        string          `yaml:"src"`
-	Dst        string          `yaml:"dst"`
-	Directions []SyncDirection `yaml:"directions"`
-	Ignore     []string        `yaml:"ignore"`
-	Enabled    bool            `yaml:"enabled"`
+	Src              string          `yaml:"src"`
+	Dst              string          `yaml:"dst"`
+	Directions       []SyncDirection `yaml:"directions"`
+	Ignore           []string        `yaml:"ignore"`
+	Enabled          bool            `yaml:"enabled"`
+	DebounceWindow   time.Duration   `yaml:"debounce_window"`
+	RemotePollWindow time.Duration   `yaml:"remote_poll_window"`
 }
 
 // Load parses a YAML configuration file and returns a Config struct.

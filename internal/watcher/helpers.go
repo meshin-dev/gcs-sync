@@ -1,23 +1,19 @@
 package watcher
 
 import (
-	"os"
-	"path/filepath"
-	"regexp"
-	"sync"
-	"time"
-
 	"gcs_sync/internal/config"
 	"gcs_sync/internal/gsutil"
 	"gcs_sync/internal/ignore"
 	"gcs_sync/internal/logging"
 	"gcs_sync/internal/util"
-
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sync"
+	"time"
 )
-
-const debounceWindow = 3 * time.Second
 
 type ruleRunner struct {
 	rule    config.SyncRule
@@ -79,21 +75,29 @@ func (rr *ruleRunner) run(stop <-chan struct{}) error {
 	// initial sync
 	rr.syncOnce("initial")
 
-	// debounce timer state
+	// ───────────────────── debounce state ────────────────────────
 	var mu sync.Mutex
 	var timer *time.Timer
 	resetDebounce := func(reason string) {
 		mu.Lock()
 		defer mu.Unlock()
 		if timer == nil {
-			timer = time.AfterFunc(debounceWindow, func() { rr.syncOnce("debounce") })
-			rr.log.Debugf("debounce timer started (%s) reason=%s", debounceWindow, reason)
+			timer = time.AfterFunc(rr.rule.DebounceWindow, func() { rr.syncOnce("debounce") })
+			rr.log.Debugf("debounce timer started (%s) reason=%s", rr.rule.DebounceWindow, reason)
 		} else {
-			timer.Reset(debounceWindow)
+			timer.Reset(rr.rule.DebounceWindow)
 		}
 	}
 
-	// main loop
+	// ───────────────────── polling ticker ────────────────────────
+	var ticker *time.Ticker
+	if containsDir(rr.rule.Directions, config.RemoteToLocal) || containsDir(rr.rule.Directions, config.Full) {
+		ticker = time.NewTicker(rr.rule.RemotePollWindow)
+		defer ticker.Stop()
+		rr.log.Infof("remote polling enabled (%s)", rr.rule.RemotePollWindow)
+	}
+
+	// ───────────────────────── main loop ─────────────────────────
 	for {
 		select {
 		case ev := <-w.Events:
@@ -102,6 +106,9 @@ func (rr *ruleRunner) run(stop <-chan struct{}) error {
 
 		case err := <-w.Errors:
 			rr.log.WithError(err).Warn("watcher error")
+
+		case <-tickerTick(ticker):
+			rr.syncOnce("periodic pull")
 
 		case <-stop:
 			rr.log.Info("stopping watcher")
@@ -125,19 +132,7 @@ func (rr *ruleRunner) run(stop <-chan struct{}) error {
 // and any errors that occur during the process.
 func (rr *ruleRunner) syncOnce(reason string) {
 	l := rr.log.WithField("reason", reason)
-
-	// ── LOCAL → REMOTE ────────────────────────────────────────────
-	if containsDir(rr.rule.Directions, config.LocalToRemote) ||
-		containsDir(rr.rule.Directions, config.Full) {
-
-		del := containsDir(rr.rule.Directions, config.Full) // -d only for 'full'
-		gsutil.RSync(rr.srcRoot, rr.rule.Dst, del, rr.ign, l)
-	}
-
-	// ── REMOTE → LOCAL ────────────────────────────────────────────
-	if containsDir(rr.rule.Directions, config.RemoteToLocal) {
-		gsutil.RSync(rr.rule.Dst, rr.srcRoot, false, rr.ign, l)
-	}
+	gsutil.RSync(rr.srcRoot, rr.rule.Dst, true, rr.ign, l)
 }
 
 // handleEvent processes a file system event and updates the watcher accordingly.
@@ -213,4 +208,12 @@ func addRecursive(w *fsnotify.Watcher, root string) error {
 		}
 		return nil
 	})
+}
+
+// tickerTick safely selects on a ticker that may be nil.
+func tickerTick(t *time.Ticker) <-chan time.Time {
+	if t != nil {
+		return t.C
+	}
+	return nil
 }
