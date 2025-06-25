@@ -8,11 +8,11 @@ services:
       # Settings folder with project yaml and service account credentials
       - ./settings:/app/settings:ro
       # All folders mounted in the Docker container from host machine for syncing
-      - ${SOURCE_FOLDER_01:-.}:/mnt/source_01:ro
+      - ${SOURCE_FOLDER_01:-.}:/mnt/source_01:${SOURCE_FOLDER_01_MODE:-ro}
 
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/settings/service-account.json
-      - CLOUDSDK_CORE_PROJECT=personal-421720
-      - CLOUDSDK_COMPUTE_REGION=me-west1
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-/app/settings/service-account-key.json}
+      - CLOUDSDK_CORE_PROJECT=${CLOUDSDK_CORE_PROJECT}
+      - CLOUDSDK_COMPUTE_REGION=${CLOUDSDK_COMPUTE_REGION}
 
     restart: unless-stopped
